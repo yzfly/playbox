@@ -2,7 +2,7 @@
 
 开源、免费、无广告的手机网页小游戏合集。纯静态 HTML5，打开即玩，可“添加到主屏幕”。
 
-**在线试玩：** https://yzfly.github.io/playbox/
+**在线试玩：** https://code.jiangshu.ai/playbox/
 
 ## 已有游戏
 
