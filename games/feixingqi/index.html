@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b0d14">
+<title>飞行棋 · 童年游戏盒</title>
+<link rel="stylesheet" href="../../shared/ui.css">
+<style>
+.dicebar { display: flex; align-items: center; gap: 14px; }
+#dice { width: 64px; height: 64px; cursor: pointer; }
+#rollBtn { min-width: 120px; padding: 14px 18px; font-size: 16px; }
+</style>
+</head>
+<body class="game">
+<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>飞行棋</h1><button class="btn sm primary" id="newBtn">新局</button></header>
+<main class="stage">
+  <div class="status" id="status"></div>
+  <canvas class="board" id="board"></canvas>
+  <div class="dicebar"><canvas id="dice"></canvas><button class="btn primary" id="rollBtn">掷骰子</button></div>
+</main>
+<script src="../../shared/ui.js"></script>
+<script src="engine.js"></script>
+<script>
+'use strict';
+const F = window.FeixingqiEngine;
+const COL = ['#ff4d6d', '#ffc53d', '#4f8cff', '#2ecc71'];
+const BASE = [[0, 0], [9, 0], [9, 9], [0, 9]];
+const FIN = [[6.75, 7.5], [7.5, 6.75], [8.25, 7.5], [7.5, 8.25]];
+const cv = document.getElementById('board'), dcv = document.getElementById('dice'), statusEl = document.getElementById('status'), rollBtn = document.getElementById('rollBtn');
+let g, cfg, phase = 'idle', dice = 0, opts = [], anim = null, size = 330, u = 22, ctx, dctx, token = 0, pulse = 0;
+
+function layout() {
+  const sp = PB.boardSpace(170); size = Math.floor(Math.min(sp.w, sp.h)); u = size / 15;
+  ctx = PB.fitCanvas(cv, size, size); dctx = PB.fitCanvas(dcv, 64, 64); draw(); drawDice();
+}
+addEventListener('resize', layout);
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+const alpha = (hex, a) => hex + Math.round(a * 255).toString(16).padStart(2, '0');
+// 第 p 家第 i 架飞机的格子中心（单位：格）
+function pieceAt(p, i, prog) {
+  if (prog === -1) { const [bx, by] = BASE[p]; return [bx + (i % 2 ? 4.1 : 1.9), by + (i < 2 ? 1.9 : 4.1)]; }
+  if (prog === F.FINISH) return FIN[p];
+  const [x, y] = F.cellOf(p, prog); return [x + .5, y + .5];
+}
+function plane(x, y, r) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(r / 10, r / 10); ctx.fillStyle = '#fff'; ctx.beginPath();
+  ctx.moveTo(0, -8); ctx.lineTo(1.6, -3); ctx.lineTo(8, 1); ctx.lineTo(8, 3); ctx.lineTo(1.6, 1); ctx.lineTo(1.2, 5); ctx.lineTo(3.5, 7); ctx.lineTo(3.5, 8.3);
+  ctx.lineTo(0, 7.4); ctx.lineTo(-3.5, 8.3); ctx.lineTo(-3.5, 7); ctx.lineTo(-1.2, 5); ctx.lineTo(-1.6, 1); ctx.lineTo(-8, 3); ctx.lineTo(-8, 1); ctx.lineTo(-1.6, -3); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function draw() {
+  if (!g) return;
+  ctx.fillStyle = '#121725'; rr(0, 0, size, size, 14); ctx.fill();
+  // 机场
+  BASE.forEach(([bx, by], p) => {
+    const on = !!g.seats[p];
+    ctx.fillStyle = alpha(COL[p], on ? .2 : .07); rr((bx + .3) * u, (by + .3) * u, 5.4 * u, 5.4 * u, u * .6); ctx.fill();
+    ctx.strokeStyle = alpha(COL[p], on ? .9 : .3); ctx.lineWidth = 2; ctx.stroke();
+    for (let i = 0; i < 4; i++) { const [x, y] = pieceAt(p, i, -1); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.arc(x * u, y * u, u * .78, 0, 7); ctx.fill(); }
+    if (on) {
+      ctx.fillStyle = alpha(COL[p], .9); ctx.font = `700 ${u * .62}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const label = F.COLOR_NAMES[p] + (cfg.seats[p] === 'ai' ? ' · 电脑' : cfg.humans > 1 ? '' : ' · 你');
+      ctx.fillText(label, (bx + 3) * u, (by + 3) * u);
+    }
+  });
+  // 外圈
+  F.TRACK.forEach(([x, y], i) => {
+    const c = F.trackColor(i), start = i % 13 === 0;
+    ctx.fillStyle = alpha(COL[c], start ? .95 : .5); rr((x + .07) * u, (y + .07) * u, .86 * u, .86 * u, u * .2); ctx.fill();
+  });
+  // 飞行捷径
+  for (let p = 0; p < 4; p++) {
+    const [ax, ay] = F.TRACK[F.abs(p, F.FLY_FROM)], [bx, by] = F.TRACK[F.abs(p, F.FLY_TO)];
+    ctx.save(); ctx.setLineDash([u * .2, u * .2]); ctx.strokeStyle = alpha(COL[p], .85); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo((ax + .5) * u, (ay + .5) * u); ctx.lineTo((bx + .5) * u, (by + .5) * u); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,.95)'; plane((ax + .5) * u, (ay + .5) * u, u * .36);
+  }
+  // 终点通道与中心
+  for (let p = 0; p < 4; p++) for (let q = 51; q <= 55; q++) { const [x, y] = F.cellOf(p, q); ctx.fillStyle = alpha(COL[p], .9); rr((x + .07) * u, (y + .07) * u, .86 * u, .86 * u, u * .2); ctx.fill(); }
+  const tri = [[[6, 6], [6, 9]], [[6, 6], [9, 6]], [[9, 6], [9, 9]], [[6, 9], [9, 9]]];
+  tri.forEach(([a, b2], p) => { ctx.fillStyle = COL[p]; ctx.beginPath(); ctx.moveTo(a[0] * u, a[1] * u); ctx.lineTo(b2[0] * u, b2[1] * u); ctx.lineTo(7.5 * u, 7.5 * u); ctx.closePath(); ctx.fill(); });
+  // 起飞箭头
+  for (let p = 0; p < 4; p++) { const [x, y] = F.TRACK[F.abs(p, 0)]; ctx.fillStyle = '#fff'; ctx.font = `700 ${u * .5}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('起', (x + .5) * u, (y + .5) * u); }
+  // 棋子（同格叠放时错开）
+  const spots = new Map();
+  g.pieces.forEach((arr, p) => {
+    if (!g.seats[p]) return;
+    arr.forEach((prog, i) => {
+      const shown = anim && anim.p === p && anim.i === i ? anim.prog : prog;
+      const [x, y] = pieceAt(p, i, shown), k = shown === -1 ? `b${p}${i}` : `${x},${y}`;
+      if (!spots.has(k)) spots.set(k, []);
+      spots.get(k).push({ p, i, x, y });
+    });
+  });
+  const pickable = phase === 'pick' ? new Set(opts.map(i => g.turn + ':' + i)) : new Set();
+  for (const list of spots.values()) list.forEach((s, n) => {
+    const off = list.length > 1 ? (n - (list.length - 1) / 2) * u * .22 : 0;
+    const x = s.x * u + off, y = s.y * u - off * .4, r = u * .42;
+    s.sx = x; s.sy = y;
+    if (pickable.has(s.p + ':' + s.i)) {
+      ctx.strokeStyle = `rgba(255,255,255,${.55 + .45 * Math.sin(pulse)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, r + 5, 0, 7); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.arc(x + 1, y + 2, r, 0, 7); ctx.fill();
+    const gr = ctx.createRadialGradient(x - r * .4, y - r * .4, r * .1, x, y, r); gr.addColorStop(0, '#ffffff'); gr.addColorStop(.25, COL[s.p]); gr.addColorStop(1, alpha(COL[s.p], 1));
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    plane(x, y, r * .78);
+  });
+  draw.spots = spots;
+}
+function drawDice() {
+  if (!dctx) return;
+  const c = dctx, p = g ? g.turn : 0;
+  c.clearRect(0, 0, 64, 64);
+  c.fillStyle = '#f7f8fb'; c.strokeStyle = COL[p]; c.lineWidth = 4;
+  c.beginPath(); c.roundRect ? c.roundRect(4, 4, 56, 56, 12) : c.rect(4, 4, 56, 56); c.fill(); c.stroke();
+  const PIPS = { 1: [[2, 2]], 2: [[1, 1], [3, 3]], 3: [[1, 1], [2, 2], [3, 3]], 4: [[1, 1], [3, 1], [1, 3], [3, 3]], 5: [[1, 1], [3, 1], [2, 2], [1, 3], [3, 3]], 6: [[1, 1], [3, 1], [1, 2], [3, 2], [1, 3], [3, 3]] };
+  c.fillStyle = dice === 1 || dice === 6 ? '#e8394f' : '#1b2030';
+  if (!dice) { c.fillStyle = '#9aa3b8'; c.font = '700 26px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('?', 32, 34); return; }
+  for (const [x, y] of PIPS[dice]) { c.beginPath(); c.arc(4 + x * 14, 4 + y * 14, 5, 0, 7); c.fill(); }
+}
+const isHuman = p => g.seats[p] === 'human';
+const pname = p => F.COLOR_NAMES[p] + '方';
+function updateStatus(msg) {
+  const p = g.turn, dot = `<span class="dot" style="background:${COL[p]}"></span>`;
+  if (phase === 'over') { statusEl.innerHTML = `${`<span class="dot" style="background:${COL[g.winner]}"></span>`}<b>${pname(g.winner)}${isHuman(g.winner) && cfg.humans === 1 ? '（你）' : ''}获胜！</b>`; return; }
+  const who = isHuman(p) ? (cfg.humans === 1 ? '轮到你' : pname(p) + '回合') : pname(p) + '（电脑）';
+  statusEl.innerHTML = `${dot}<b>${who}</b>${msg ? ' · ' + msg : ''}`;
+  rollBtn.disabled = !(phase === 'roll' && isHuman(p));
+}
+async function startTurn() {
+  phase = 'roll'; dice = 0; opts = []; drawDice(); updateStatus(isHuman(g.turn) ? '请掷骰子' : ''); draw();
+  if (!isHuman(g.turn)) { const t = token; await PB.sleep(550); if (t === token) roll(); }
+}
+async function roll() {
+  if (phase !== 'roll') return;
+  const t = token; phase = 'rolling'; updateStatus();
+  for (let k = 0; k < 7; k++) { dice = 1 + ((Math.random() * 6) | 0); drawDice(); await PB.sleep(55); if (t !== token) return; }
+  dice = 1 + ((Math.random() * 6) | 0); drawDice();
+  const p = g.turn; opts = F.movable(g, p, dice);
+  if (!opts.length) { updateStatus(`掷出 ${dice}，没有可走的飞机`); await PB.sleep(900); if (t === token) endMove(); return; }
+  const same = opts.every(i => g.pieces[p][i] === g.pieces[p][opts[0]]);
+  if (isHuman(p) && !(opts.length === 1 || same)) { phase = 'pick'; updateStatus(`掷出 ${dice}，点一架飞机`); animatePick(); return; }
+  await PB.sleep(isHuman(p) ? 200 : 420); if (t !== token) return;
+  doMove(isHuman(p) ? opts[0] : F.aiChoose(g, p, dice));
+}
+function animatePick() { if (phase !== 'pick') { draw(); return; } pulse += .18; draw(); requestAnimationFrame(animatePick); }
+async function doMove(i) {
+  const t = token, p = g.turn; phase = 'anim'; updateStatus();
+  const r = F.plan(g, p, i, dice);
+  for (const s of r.steps) { anim = { p, i, prog: s }; draw(); await PB.sleep(160); if (t !== token) return; }
+  anim = null; F.apply(g, p, i, dice);
+  if (r.bumps.length) PB.toast(`💥 撞机！${[...new Set(r.bumps.map(b => pname(b[0])))].join('、')}的飞机回到机场`);
+  else if (r.flew) PB.toast('✈️ 飞行捷径！');
+  else if (r.jumped) PB.toast('同色格，跳跃前进');
+  else if (r.to === F.FINISH) PB.toast(`🎯 ${pname(p)}一架飞机到达终点`);
+  draw(); await PB.sleep(260); if (t !== token) return;
+  endMove();
+}
+function endMove() {
+  if (g.winner >= 0) { phase = 'over'; updateStatus(); draw(); PB.toast(statusEl.textContent, 3000); return; }
+  const prev = g.turn;
+  F.nextTurn(g, dice);
+  if (g.turn === prev && dice === 6) PB.toast(`${pname(prev)}掷出 6，再掷一次`);
+  startTurn();
+}
+cv.addEventListener('pointerdown', ev => {
+  if (phase !== 'pick' || !isHuman(g.turn)) return;
+  const rect = cv.getBoundingClientRect(), s = rect.width / size, x = (ev.clientX - rect.left) / s, y = (ev.clientY - rect.top) / s;
+  let best = -1, bd = (u * .9) ** 2;
+  for (const list of draw.spots.values()) for (const sp of list) {
+    if (sp.p !== g.turn || !opts.includes(sp.i)) continue;
+    const d = (sp.sx - x) ** 2 + (sp.sy - y) ** 2; if (d < bd) { bd = d; best = sp.i; }
+  }
+  if (best >= 0) doMove(best);
+});
+rollBtn.onclick = () => { if (isHuman(g.turn)) roll(); };
+dcv.onclick = () => { if (phase === 'roll' && isHuman(g.turn)) roll(); };
+async function newGame(ask) {
+  token++;
+  if (ask || !cfg) {
+    const mode = await PB.choose('选择人数', [
+      { label: '我 vs 3 个电脑', hint: '四人热闹局', value: '1v3', primary: true },
+      { label: '我 vs 1 个电脑', hint: '红蓝对决', value: '1v1' },
+      { label: '双人同屏', hint: '红蓝两人轮流', value: '2p' },
+      { label: '四人同屏', hint: '四人轮流用一台手机', value: '4p' }]);
+    const seats = { '1v3': ['human', 'ai', 'ai', 'ai'], '1v1': ['human', null, 'ai', null], '2p': ['human', null, 'human', null], '4p': ['human', 'human', 'human', 'human'] }[mode];
+    cfg = { mode, seats, humans: seats.filter(s => s === 'human').length }; PB.store.set('feixingqi:cfg', cfg);
+  }
+  g = F.newGame(cfg.seats.slice()); anim = null;
+  layout(); startTurn();
+}
+document.getElementById('newBtn').onclick = () => newGame(true);
+PB.markPlayed('feixingqi');
+cfg = PB.store.get('feixingqi:cfg', null);
+newGame(!cfg);
+</script>
+</body>
+</html>

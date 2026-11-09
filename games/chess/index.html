@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b0d14">
+<title>国际象棋 · 童年游戏盒</title>
+<link rel="stylesheet" href="../../shared/ui.css">
+</head>
+<body class="game">
+<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>国际象棋</h1><button class="btn sm primary" id="newBtn">新局</button></header>
+<main class="stage">
+  <div class="status" id="status"></div>
+  <canvas class="board" id="board"></canvas>
+  <div class="toolbar">
+    <button class="btn" id="undoBtn">悔棋</button>
+    <button class="btn" id="flipBtn">翻转棋盘</button>
+  </div>
+</main>
+<script src="../../shared/ui.js"></script>
+<script src="engine.js"></script>
+<script>
+'use strict';
+const E = window.ChessEngine;
+const cv = document.getElementById('board'), statusEl = document.getElementById('status');
+const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+const PIECE_FONT = '"Noto Sans Symbols 2","Noto Sans Symbols","Segoe UI Symbol","DejaVu Sans","Apple Symbols",serif';
+let pos, cfg, sel = -1, targets = [], lastMove = null, flipped = false, keys = [], thinking = false, over = null, aiToken = 0, size = 320, ctx;
+const runAI = PB.engineWorker('engine.js', `function (d) {
+  const p = new self.ChessEngine.Pos(); Object.assign(p, d.state); p.hist = [];
+  const m = self.ChessEngine.bestMove(p, d.level); return m && { from: m.from, to: m.to, promo: m.promo };
+}`, d => { const p = new E.Pos(); Object.assign(p, d.state); p.hist = []; const m = E.bestMove(p, d.level); return m && { from: m.from, to: m.to, promo: m.promo }; });
+
+function layout() {
+  const sp = PB.boardSpace(140); size = Math.floor(Math.min(sp.w, sp.h) / 8) * 8;
+  ctx = PB.fitCanvas(cv, size, size); draw();
+}
+addEventListener('resize', layout);
+
+const sqXY = s => { let c = s & 7, r = s >> 4; if (flipped) { c = 7 - c; r = 7 - r; } return [c, r]; };
+function draw() {
+  if (!pos) return;
+  const q = size / 8;
+  for (let s = 0; s < 128; s++) {
+    if (s & 0x88) { s += 7; continue; }
+    const [c, r] = sqXY(s), light = ((s >> 4) + (s & 7)) % 2 === 0;
+    ctx.fillStyle = light ? '#e3e8f0' : '#7b8cab'; ctx.fillRect(c * q, r * q, q, q);
+    if (lastMove && (s === lastMove.from || s === lastMove.to)) { ctx.fillStyle = 'rgba(255,205,70,.45)'; ctx.fillRect(c * q, r * q, q, q); }
+    if (s === sel) { ctx.fillStyle = 'rgba(79,140,255,.55)'; ctx.fillRect(c * q, r * q, q, q); }
+  }
+  // 被将军的王
+  if (pos.inCheck()) {
+    const [c, r] = sqXY(pos.ksq[pos.side]);
+    const g = ctx.createRadialGradient(c * q + q / 2, r * q + q / 2, q * .1, c * q + q / 2, r * q + q / 2, q * .7);
+    g.addColorStop(0, 'rgba(255,40,70,.9)'); g.addColorStop(1, 'rgba(255,40,70,0)'); ctx.fillStyle = g; ctx.fillRect(c * q, r * q, q, q);
+  }
+  // 坐标
+  ctx.font = `600 ${Math.max(9, q * .17)}px sans-serif`; ctx.textBaseline = 'alphabetic';
+  for (let i = 0; i < 8; i++) {
+    const file = flipped ? 7 - i : i, rank = flipped ? i + 1 : 8 - i;
+    ctx.fillStyle = (i + 7) % 2 === 0 ? '#7b8cab' : '#e3e8f0'; ctx.textAlign = 'right'; ctx.fillText('abcdefgh'[file], (i + 1) * q - 3, size - 3);
+    ctx.fillStyle = i % 2 === 0 ? '#7b8cab' : '#e3e8f0'; ctx.textAlign = 'left'; ctx.fillText(rank, 3, i * q + q * .2);
+  }
+  // 棋子
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `${q * .78}px ${PIECE_FONT}`;
+  for (let s = 0; s < 128; s++) {
+    if (s & 0x88) { s += 7; continue; }
+    const p = pos.b[s]; if (!p) continue;
+    const [c, r] = sqXY(s), x = c * q + q / 2, y = r * q + q * .54, white = p < 'a';
+    const ch = GLYPH[p.toLowerCase()] + '︎';
+    ctx.lineJoin = 'round'; ctx.lineWidth = q * .07;
+    ctx.strokeStyle = white ? '#1b2030' : '#f4f6fb'; ctx.strokeText(ch, x, y);
+    ctx.fillStyle = white ? '#ffffff' : '#141824'; ctx.fillText(ch, x, y);
+  }
+  // 可走提示
+  for (const m of targets) {
+    const [c, r] = sqXY(m.to);
+    ctx.beginPath();
+    if (pos.b[m.to] || m.flag === 'e') { ctx.lineWidth = q * .08; ctx.strokeStyle = 'rgba(20,30,60,.55)'; ctx.arc(c * q + q / 2, r * q + q / 2, q * .44, 0, 7); ctx.stroke(); }
+    else { ctx.fillStyle = 'rgba(20,30,60,.38)'; ctx.arc(c * q + q / 2, r * q + q / 2, q * .15, 0, 7); ctx.fill(); }
+  }
+}
+const sideName = s => (s === 'w' ? '白方' : '黑方');
+function updateStatus() {
+  if (over) {
+    const t = over.type === 'mate' ? `将死！${sideName(over.winner)}胜` : over.type === 'stalemate' ? '逼和（无子可动）' : over.type === 'fifty' ? '和棋（50 回合规则）' : over.type === 'material' ? '和棋（子力不足）' : '和棋（三次重复）';
+    statusEl.innerHTML = `<b>${t}</b>`; return;
+  }
+  const dot = `<span class="dot" style="background:${pos.side === 'w' ? '#fff' : '#141824'}"></span>`;
+  let who = cfg.mode === 'ai' ? (pos.side === cfg.human ? '轮到你' : '电脑思考中…') : `${sideName(pos.side)}走棋`;
+  statusEl.innerHTML = `${dot}<b>${who}</b>${pos.inCheck() ? ' · 将军！' : ''}`;
+}
+function repCount() { const k = pos.key(); return keys.filter(x => x === k).length; }
+function afterMove(m) {
+  lastMove = m; sel = -1; targets = []; keys.push(pos.key());
+  over = pos.result(repCount());
+  updateStatus(); draw();
+  if (over) { setTimeout(() => PB.toast(statusEl.textContent, 2600), 200); return; }
+  maybeAI();
+}
+async function maybeAI() {
+  if (over || cfg.mode !== 'ai' || pos.side === cfg.human) return;
+  thinking = true; updateStatus();
+  const token = ++aiToken;
+  const state = { b: pos.b.slice(), side: pos.side, cast: pos.cast, ep: pos.ep, half: pos.half, full: pos.full, ksq: { ...pos.ksq } };
+  const t0 = Date.now();
+  const r = await runAI({ state, level: cfg.level });
+  if (token !== aiToken || !r) return;
+  if (Date.now() - t0 < 350) await PB.sleep(350 - (Date.now() - t0));
+  if (token !== aiToken) return;
+  const m = pos.legal().find(x => x.from === r.from && x.to === r.to && x.promo === r.promo);
+  thinking = false;
+  if (m) { pos.make(m); afterMove(m); }
+}
+async function tap(ev) {
+  if (over || thinking) return;
+  if (cfg.mode === 'ai' && pos.side !== cfg.human) return;
+  const rect = cv.getBoundingClientRect(), q = rect.width / 8;
+  let c = Math.floor((ev.clientX - rect.left) / q), r = Math.floor((ev.clientY - rect.top) / q);
+  if (flipped) { c = 7 - c; r = 7 - r; }
+  if (c < 0 || c > 7 || r < 0 || r > 7) return;
+  const s = r * 16 + c, p = pos.b[s];
+  const hits = targets.filter(m => m.to === s);
+  if (hits.length) {
+    let m = hits[0];
+    if (hits.length > 1) {
+      const w = pos.side === 'w';
+      const pr = await PB.choose('兵升变', [
+        { label: '后 ♛', value: 'q', primary: true }, { label: '车 ♜', value: 'r' }, { label: '象 ♝', value: 'b' }, { label: '马 ♞', value: 'n' }]);
+      m = hits.find(x => x.promo === (w ? pr.toUpperCase() : pr));
+    }
+    pos.make(m); afterMove(m); return;
+  }
+  if (p && E.colorOf(p) === pos.side) { sel = s; targets = pos.legal().filter(m => m.from === s); }
+  else { sel = -1; targets = []; }
+  draw();
+}
+cv.addEventListener('pointerdown', tap);
+
+function undo() {
+  if (!pos.hist.length) return;
+  aiToken++; thinking = false;
+  const n = cfg.mode === 'ai' ? (pos.side === cfg.human ? 2 : 1) : 1;
+  for (let i = 0; i < n && pos.hist.length; i++) { pos.unmake(); keys.pop(); }
+  // 人机模式下只剩电脑先手的一步时，交给电脑重下
+  over = null; sel = -1; targets = []; lastMove = pos.hist.length ? pos.hist[pos.hist.length - 1].m : null;
+  updateStatus(); draw(); maybeAI();
+}
+async function newGame(ask) {
+  aiToken++; thinking = false;
+  if (ask || !cfg) {
+    const mode = await PB.choose('选择模式', [
+      { label: '人机对战', hint: '和电脑下', value: 'ai', primary: true },
+      { label: '双人同屏', hint: '两人轮流用一台手机', value: 'pvp' }]);
+    let level = 'normal', human = 'w';
+    if (mode === 'ai') {
+      level = await PB.choose('电脑难度', PB.LEVELS);
+      human = await PB.choose('选择执子', [{ label: '执白（先走）', value: 'w', primary: true }, { label: '执黑（后走）', value: 'b' }]);
+    }
+    cfg = { mode, level, human }; PB.store.set('chess:cfg', cfg);
+  }
+  pos = new E.Pos(); keys = [pos.key()]; sel = -1; targets = []; lastMove = null; over = null;
+  flipped = cfg.mode === 'ai' && cfg.human === 'b';
+  updateStatus(); layout(); maybeAI();
+}
+document.getElementById('newBtn').onclick = () => newGame(true);
+document.getElementById('undoBtn').onclick = undo;
+document.getElementById('flipBtn').onclick = () => { flipped = !flipped; draw(); };
+PB.markPlayed('chess');
+cfg = PB.store.get('chess:cfg', null);
+newGame(!cfg);
+</script>
+</body>
+</html>

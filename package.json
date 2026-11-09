@@ -1,0 +1,11 @@
+{
+  "name": "playbox",
+  "version": "0.1.0",
+  "private": true,
+  "description": "童年游戏盒：开源、免费、无广告的手机网页小游戏合集",
+  "license": "MIT",
+  "scripts": {
+    "test": "node tests/run-all.js",
+    "serve": "python3 -m http.server 8765"
+  }
+}

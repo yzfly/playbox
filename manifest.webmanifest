@@ -1,0 +1,11 @@
+{
+  "name": "童年游戏盒 PlayBox",
+  "short_name": "童年游戏盒",
+  "description": "开源、免费、无广告的手机网页小游戏合集",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0d14",
+  "theme_color": "#0b0d14",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

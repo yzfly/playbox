@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b0d14">
+<title>跳棋 · 童年游戏盒</title>
+<link rel="stylesheet" href="../../shared/ui.css">
+</head>
+<body class="game">
+<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>跳棋</h1><button class="btn sm primary" id="newBtn">新局</button></header>
+<main class="stage">
+  <div class="status" id="status"></div>
+  <canvas class="board" id="board"></canvas>
+  <div class="toolbar">
+    <button class="btn" id="undoBtn">悔棋</button>
+    <button class="btn" id="hintBtn">提示</button>
+  </div>
+</main>
+<script src="../../shared/ui.js"></script>
+<script src="engine.js"></script>
+<script>
+'use strict';
+const T = window.TiaoqiEngine;
+const ARM_COL = ['#ff4d6d', '#ffb02e', '#2ecc71', '#4f8cff', '#b36bff', '#25c2c2'];
+const ARM_NAME = ['红', '橙', '绿', '蓝', '紫', '青'];
+const cv = document.getElementById('board'), statusEl = document.getElementById('status');
+let g, cfg, sel = -1, reach = [], last = null, anim = null, hist = [], token = 0, busy = false, ctx, W = 320, H = 360, sc = 20, cx = 160, cy = 180, hintMove = null;
+
+function layout() {
+  const sp = PB.boardSpace(140);
+  sc = Math.min(sp.w / 13.4, sp.h / 15.2); W = Math.floor(sc * 13.4); H = Math.floor(sc * 15.2); cx = W / 2; cy = H / 2;
+  ctx = PB.fitCanvas(cv, W, H); draw();
+}
+addEventListener('resize', layout);
+const XY = i => [cx + T.cells[i].px * sc, cy + T.cells[i].py * sc];
+const colOf = p => ARM_COL[g.seats[p].arm];
+const nameOf = p => ARM_NAME[g.seats[p].arm] + '方';
+function ball(x, y, r, col) {
+  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.arc(x + 1, y + 2, r, 0, 7); ctx.fill();
+  const gr = ctx.createRadialGradient(x - r * .4, y - r * .45, r * .1, x, y, r);
+  gr.addColorStop(0, '#ffffff'); gr.addColorStop(.3, col); gr.addColorStop(1, col);
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 1; ctx.stroke();
+}
+function draw() {
+  if (!g) return;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#121725'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(0, 0, W, H, 16) : ctx.rect(0, 0, W, H); ctx.fill();
+  // 营地底色：参与的玩家起点营地和目标营地
+  const armOwner = {};
+  g.seats.forEach((s, p) => { armOwner[s.arm] = p; });
+  T.ARMS.forEach((arm, k) => {
+    const owner = armOwner[k] !== undefined ? armOwner[k] : armOwner[(k + 3) % 6];
+    if (owner === undefined) return;
+    // 三角营地的三个角：营地内只有 2 个邻居的孔
+    const inArm = new Set(arm);
+    const corner = arm.filter(i => T.nbr[i].filter(j => inArm.has(j)).length === 2);
+    ctx.fillStyle = ARM_COL[g.seats[owner].arm] + '24';
+    ctx.beginPath(); const cs = corner.map(XY); cs.forEach(([x, y], n) => (n ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
+    ctx.lineJoin = 'round'; ctx.lineWidth = sc * 1.2; ctx.strokeStyle = ARM_COL[g.seats[owner].arm] + '24'; ctx.stroke(); ctx.fill();
+  });
+  // 连线
+  ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1; ctx.beginPath();
+  T.cells.forEach((c, i) => T.nbr[i].forEach(j => { if (j > i) { const [a, b] = XY(i), [d, e] = XY(j); ctx.moveTo(a, b); ctx.lineTo(d, e); } }));
+  ctx.stroke();
+  // 孔
+  for (let i = 0; i < T.cells.length; i++) { const [x, y] = XY(i); ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.arc(x, y, sc * .3, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.stroke(); }
+  // 上一步路径
+  const path = anim ? null : last ? last.path : null;
+  if (path) {
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath();
+    path.forEach((i, n) => { const [x, y] = XY(i); n ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // 棋子
+  const R = sc * .4;
+  g.occ.forEach((p, i) => {
+    if (p < 0 || (anim && anim.from === i)) return;
+    const [x, y] = XY(i); ball(x, y, R, colOf(p));
+  });
+  if (anim) { ball(anim.x, anim.y - 4, R * 1.05, colOf(anim.p)); }
+  if (sel >= 0) { const [x, y] = XY(sel); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, R + 4, 0, 7); ctx.stroke(); }
+  for (const m of reach) { const [x, y] = XY(m.to); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(x, y, sc * .16, 0, 7); ctx.fill(); }
+  if (hintMove) for (const i of [hintMove.from, hintMove.to]) { const [x, y] = XY(i); ctx.strokeStyle = '#4f8cff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, R + 4, 0, 7); ctx.stroke(); }
+}
+const human = p => g.seats[p].kind === 'human';
+function updateStatus() {
+  const p = g.winner >= 0 ? g.winner : g.turn, dot = `<span class="dot" style="background:${colOf(p)}"></span>`;
+  if (g.winner >= 0) { statusEl.innerHTML = `${dot}<b>${cfg.humans === 1 ? (human(p) ? '你赢了！🎉' : nameOf(p) + '（电脑）获胜') : nameOf(p) + '获胜！'}</b>`; return; }
+  statusEl.innerHTML = `${dot}<b>${human(p) ? (cfg.humans === 1 ? '轮到你' : nameOf(p) + '走棋') : nameOf(p) + '（电脑）思考中…'}</b>`;
+}
+async function play(m) {
+  const t = token, p = g.occ[m.from]; busy = true; sel = -1; reach = []; hintMove = null;
+  hist.push({ occ: g.occ.slice(), turn: g.turn, last });
+  for (let k = 1; k < m.path.length; k++) {
+    const [ax, ay] = XY(m.path[k - 1]), [bx, by] = XY(m.path[k]);
+    for (let f = 1; f <= 6; f++) { const e = f / 6; anim = { from: m.from, p, x: ax + (bx - ax) * e, y: ay + (by - ay) * e - Math.sin(e * Math.PI) * sc * .5 }; draw(); await PB.sleep(22); if (t !== token) return; }
+  }
+  anim = null; T.apply(g, m); last = m; busy = false;
+  updateStatus(); draw();
+  if (g.winner >= 0) { PB.toast(statusEl.textContent, 3000); return; }
+  next();
+}
+async function next() {
+  const t = token, p = g.turn;
+  if (human(p)) { if (!T.allMoves(g, p).length) { g.turn = (g.turn + 1) % g.seats.length; next(); } return; }
+  busy = true; updateStatus();
+  await PB.sleep(380); if (t !== token) return;
+  const m = T.aiMove(g, p);
+  if (!m) { g.turn = (g.turn + 1) % g.seats.length; busy = false; updateStatus(); next(); return; }
+  play(m);
+}
+cv.addEventListener('pointerdown', ev => {
+  if (busy || g.winner >= 0 || !human(g.turn)) return;
+  const rect = cv.getBoundingClientRect(), s = rect.width / W, x = (ev.clientX - rect.left) / s, y = (ev.clientY - rect.top) / s;
+  let best = -1, bd = (sc * .75) ** 2;
+  T.cells.forEach((c, i) => { const [a, b] = XY(i), d = (a - x) ** 2 + (b - y) ** 2; if (d < bd) { bd = d; best = i; } });
+  if (best < 0) return;
+  const hit = reach.find(m => m.to === best);
+  if (hit) { play({ from: sel, to: hit.to, path: hit.path }); return; }
+  if (g.occ[best] === g.turn) { sel = best; reach = T.reach(g, best); hintMove = null; if (!reach.length) PB.toast('这颗棋子现在走不了'); }
+  else { sel = -1; reach = []; }
+  draw();
+});
+function undo() {
+  if (!hist.length) return;
+  token++; busy = false;
+  let h;
+  do { h = hist.pop(); } while (hist.length && cfg.humans === 1 && !human(h.turn));
+  g.occ = h.occ; g.turn = h.turn; g.winner = -1; last = h.last; sel = -1; reach = []; anim = null; hintMove = null;
+  updateStatus(); draw(); next();
+}
+async function newGame(ask) {
+  token++; busy = false;
+  if (ask || !cfg) {
+    const mode = await PB.choose('选择人数', [
+      { label: '我 vs 电脑', hint: '两人对角', value: '1v1', primary: true },
+      { label: '我 vs 2 个电脑', hint: '三人局', value: '1v2' },
+      { label: '我 vs 5 个电脑', hint: '六人满盘', value: '1v5' },
+      { label: '双人同屏', hint: '两人轮流用一台手机', value: '2p' }]);
+    const n = { '1v1': 2, '1v2': 3, '1v5': 6, '2p': 2 }[mode];
+    const seats = T.LAYOUTS[n].map((arm, p) => ({ arm, kind: p === 0 || mode === '2p' ? 'human' : 'ai' }));
+    cfg = { mode, seats, humans: seats.filter(s => s.kind === 'human').length }; PB.store.set('tiaoqi:cfg', cfg);
+  }
+  g = T.newGame(cfg.seats.map(s => ({ ...s }))); hist = []; last = null; sel = -1; reach = []; anim = null; hintMove = null;
+  layout(); updateStatus(); next();
+}
+document.getElementById('newBtn').onclick = () => newGame(true);
+document.getElementById('undoBtn').onclick = undo;
+document.getElementById('hintBtn').onclick = () => { if (busy || g.winner >= 0 || !human(g.turn)) return; hintMove = T.aiMove(g, g.turn); sel = -1; reach = []; draw(); };
+PB.markPlayed('tiaoqi');
+cfg = PB.store.get('tiaoqi:cfg', null);
+newGame(!cfg);
+</script>
+</body>
+</html>

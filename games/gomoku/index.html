@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b0d14">
+<title>五子棋 · 童年游戏盒</title>
+<link rel="stylesheet" href="../../shared/ui.css">
+</head>
+<body class="game">
+<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>五子棋</h1><button class="btn sm primary" id="newBtn">新局</button></header>
+<main class="stage">
+  <div class="status" id="status"></div>
+  <canvas class="board" id="board"></canvas>
+  <div class="toolbar">
+    <button class="btn" id="undoBtn">悔棋</button>
+    <button class="btn" id="hintBtn">提示</button>
+  </div>
+</main>
+<script src="../../shared/ui.js"></script>
+<script src="engine.js"></script>
+<script>
+'use strict';
+const E = window.GomokuEngine, N = E.N;
+const cv = document.getElementById('board'), statusEl = document.getElementById('status');
+let b, turn, hist, cfg, win = null, size = 320, cell, pad, ctx, aiToken = 0, hint = -1, busy = false;
+
+function layout() {
+  const sp = PB.boardSpace(140); size = Math.floor(Math.min(sp.w, sp.h));
+  cell = size / (N + 0.6); pad = cell * 0.8;
+  ctx = PB.fitCanvas(cv, size, size); draw();
+}
+addEventListener('resize', layout);
+const P = i => pad + i * cell;
+function draw() {
+  if (!b) return;
+  const g = ctx.createLinearGradient(0, 0, size, size); g.addColorStop(0, '#efd29b'); g.addColorStop(1, '#ddb576');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = 'rgba(90,55,20,.85)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let i = 0; i < N; i++) { ctx.moveTo(P(0), P(i)); ctx.lineTo(P(N - 1), P(i)); ctx.moveTo(P(i), P(0)); ctx.lineTo(P(i), P(N - 1)); }
+  ctx.stroke();
+  ctx.lineWidth = 2; ctx.strokeRect(P(0), P(0), cell * (N - 1), cell * (N - 1));
+  ctx.fillStyle = 'rgba(90,55,20,.95)';
+  for (const [x, y] of [[3, 3], [11, 3], [7, 7], [3, 11], [11, 11]]) { ctx.beginPath(); ctx.arc(P(x), P(y), cell * .12, 0, 7); ctx.fill(); }
+  const R = cell * .45;
+  for (let i = 0; i < N * N; i++) {
+    if (!b[i]) continue;
+    const x = P(i % N), y = P((i / N) | 0), black = b[i] === 1;
+    ctx.fillStyle = 'rgba(40,20,0,.3)'; ctx.beginPath(); ctx.arc(x + 1.2, y + 2, R, 0, 7); ctx.fill();
+    const sg = ctx.createRadialGradient(x - R * .35, y - R * .4, R * .1, x, y, R);
+    if (black) { sg.addColorStop(0, '#6a7080'); sg.addColorStop(1, '#0d0f14'); } else { sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, '#cfd3db'); }
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill();
+  }
+  if (hist.length) { const i = hist[hist.length - 1]; ctx.fillStyle = '#ff3b5c'; ctx.beginPath(); ctx.arc(P(i % N), P((i / N) | 0), cell * .12, 0, 7); ctx.fill(); }
+  if (hint >= 0) { ctx.strokeStyle = '#2f7bff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(P(hint % N), P((hint / N) | 0), R, 0, 7); ctx.stroke(); }
+  if (win) {
+    ctx.strokeStyle = 'rgba(255,59,92,.9)'; ctx.lineWidth = cell * .14; ctx.lineCap = 'round'; ctx.beginPath();
+    ctx.moveTo(P(win[0][0]), P(win[0][1])); ctx.lineTo(P(win[win.length - 1][0]), P(win[win.length - 1][1])); ctx.stroke();
+  }
+}
+const name = w => (w === 1 ? '黑方' : '白方');
+function updateStatus() {
+  if (win) { const w = b[win[0][1] * N + win[0][0]]; statusEl.innerHTML = `<b>${cfg.mode === 'ai' ? (w === cfg.human ? '你赢了！🎉' : '电脑获胜') : name(w) + '获胜！'}</b>`; return; }
+  if (hist.length === N * N) { statusEl.innerHTML = '<b>平局</b>'; return; }
+  const dot = `<span class="dot" style="background:${turn === 1 ? '#0d0f14' : '#fff'}"></span>`;
+  statusEl.innerHTML = `${dot}<b>${cfg.mode === 'ai' ? (turn === cfg.human ? '轮到你' : '电脑思考中…') : name(turn) + '落子'}</b>`;
+}
+function place(i) {
+  b[i] = turn; hist.push(i); hint = -1;
+  win = E.winLine(b, i % N, (i / N) | 0);
+  turn = 3 - turn; updateStatus(); draw();
+  if (win) { setTimeout(() => PB.toast(statusEl.textContent, 2600), 150); return; }
+  maybeAI();
+}
+async function maybeAI() {
+  if (win || cfg.mode !== 'ai' || turn === cfg.human || hist.length === N * N) return;
+  const token = ++aiToken; busy = true; updateStatus();
+  await PB.sleep(380);
+  if (token !== aiToken) return;
+  const m = E.bestMove(b, turn, cfg.level); busy = false;
+  if (m >= 0) place(m);
+}
+cv.addEventListener('pointerdown', ev => {
+  if (win || busy || (cfg.mode === 'ai' && turn !== cfg.human)) return;
+  const rect = cv.getBoundingClientRect(), s = rect.width / size;
+  const x = Math.round(((ev.clientX - rect.left) / s - pad) / cell), y = Math.round(((ev.clientY - rect.top) / s - pad) / cell);
+  if (x < 0 || y < 0 || x >= N || y >= N || b[y * N + x]) return;
+  place(y * N + x);
+});
+function undo() {
+  if (!hist.length) return;
+  aiToken++; busy = false;
+  // 人机模式：一直退到轮到玩家为止（至少退一步）
+  do { b[hist.pop()] = 0; turn = 3 - turn; } while (cfg.mode === 'ai' && hist.length && turn !== cfg.human);
+  win = null; hint = -1; updateStatus(); draw(); maybeAI();
+}
+async function newGame(ask) {
+  aiToken++; busy = false;
+  if (ask || !cfg) {
+    const mode = await PB.choose('选择模式', [
+      { label: '人机对战', hint: '和电脑下', value: 'ai', primary: true },
+      { label: '双人同屏', hint: '两人轮流用一台手机', value: 'pvp' }]);
+    let level = 'normal', human = 1;
+    if (mode === 'ai') {
+      level = await PB.choose('电脑难度', PB.LEVELS);
+      human = await PB.choose('选择执子', [{ label: '执黑（先手）', value: 1, primary: true }, { label: '执白（后手）', value: 2 }]);
+    }
+    cfg = { mode, level, human }; PB.store.set('gomoku:cfg', cfg);
+  }
+  b = new Array(N * N).fill(0); turn = 1; hist = []; win = null; hint = -1;
+  updateStatus(); layout(); maybeAI();
+}
+document.getElementById('newBtn').onclick = () => newGame(true);
+document.getElementById('undoBtn').onclick = undo;
+document.getElementById('hintBtn').onclick = () => { if (win || busy) return; hint = E.bestMove(b, turn, 'normal'); draw(); };
+PB.markPlayed('gomoku');
+cfg = PB.store.get('gomoku:cfg', null);
+newGame(!cfg);
+</script>
+</body>
+</html>

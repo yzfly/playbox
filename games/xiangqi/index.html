@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b0d14">
+<title>中国象棋 · 童年游戏盒</title>
+<link rel="stylesheet" href="../../shared/ui.css">
+</head>
+<body class="game">
+<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>中国象棋</h1><button class="btn sm primary" id="newBtn">新局</button></header>
+<main class="stage">
+  <div class="status" id="status"></div>
+  <canvas class="board" id="board"></canvas>
+  <div class="toolbar">
+    <button class="btn" id="undoBtn">悔棋</button>
+    <button class="btn" id="flipBtn">翻转棋盘</button>
+  </div>
+</main>
+<script src="../../shared/ui.js"></script>
+<script src="engine.js"></script>
+<script>
+'use strict';
+const E = window.XiangqiEngine;
+const cv = document.getElementById('board'), statusEl = document.getElementById('status');
+const CN_FONT = '"PingFang SC","Noto Serif CJK SC","Noto Sans CJK SC","Songti SC","Microsoft YaHei",serif';
+let pos, cfg, sel = -1, targets = [], lastMove = null, flipped = false, keys = [], thinking = false, over = null, aiToken = 0;
+let W = 300, H = 330, cell = 30, ox = 15, oy = 15, ctx;
+const run = d => { const p = new E.Pos(); Object.assign(p, d.state); p.hist = []; const m = E.bestMove(p, d.level); return m && { from: m.from, to: m.to }; };
+const runAI = PB.engineWorker('engine.js', `function (d) {
+  const p = new self.XiangqiEngine.Pos(); Object.assign(p, d.state); p.hist = [];
+  const m = self.XiangqiEngine.bestMove(p, d.level); return m && { from: m.from, to: m.to };
+}`, run);
+
+function layout() {
+  const sp = PB.boardSpace(140);
+  cell = Math.floor(Math.min(sp.w / 9, sp.h / 10));
+  W = cell * 9; H = cell * 10; ox = cell / 2; oy = cell / 2;
+  ctx = PB.fitCanvas(cv, W, H); draw();
+}
+addEventListener('resize', layout);
+const toXY = s => { let c = s % 9, r = (s / 9) | 0; if (flipped) { c = 8 - c; r = 9 - r; } return [ox + c * cell, oy + r * cell]; };
+
+function drawBoard() {
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, '#f1d9a8'); g.addColorStop(1, '#e2bf82');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#7a4f24'; ctx.lineWidth = 1.2;
+  const X = c => ox + c * cell, Y = r => oy + r * cell;
+  ctx.beginPath();
+  for (let r = 0; r < 10; r++) { ctx.moveTo(X(0), Y(r)); ctx.lineTo(X(8), Y(r)); }
+  for (let c = 0; c < 9; c++) {
+    if (c === 0 || c === 8) { ctx.moveTo(X(c), Y(0)); ctx.lineTo(X(c), Y(9)); }
+    else { ctx.moveTo(X(c), Y(0)); ctx.lineTo(X(c), Y(4)); ctx.moveTo(X(c), Y(5)); ctx.lineTo(X(c), Y(9)); }
+  }
+  // 九宫斜线
+  ctx.moveTo(X(3), Y(0)); ctx.lineTo(X(5), Y(2)); ctx.moveTo(X(5), Y(0)); ctx.lineTo(X(3), Y(2));
+  ctx.moveTo(X(3), Y(7)); ctx.lineTo(X(5), Y(9)); ctx.moveTo(X(5), Y(7)); ctx.lineTo(X(3), Y(9));
+  ctx.stroke();
+  ctx.lineWidth = 2.2; ctx.strokeRect(X(0) - 4, Y(0) - 4, cell * 8 + 8, cell * 9 + 8);
+  // 兵炮位标记
+  const mark = (c, r) => {
+    const x = X(c), y = Y(r), d = cell * .08, l = cell * .16; ctx.lineWidth = 1.1; ctx.beginPath();
+    for (const sx of [-1, 1]) { if ((sx < 0 && c === 0) || (sx > 0 && c === 8)) continue;
+      for (const sy of [-1, 1]) { ctx.moveTo(x + sx * d, y + sy * (d + l)); ctx.lineTo(x + sx * d, y + sy * d); ctx.lineTo(x + sx * (d + l), y + sy * d); } }
+    ctx.stroke();
+  };
+  for (const r of [2, 7]) for (const c of [1, 7]) mark(c, r);
+  for (const r of [3, 6]) for (const c of [0, 2, 4, 6, 8]) mark(c, r);
+  ctx.fillStyle = 'rgba(122,79,36,.75)'; ctx.font = `600 ${cell * .42}px ${CN_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const ry = Y(4.5);
+  ctx.save(); ctx.translate(X(2), ry); if (flipped) ctx.rotate(Math.PI); ctx.fillText('楚 河', 0, 0); ctx.restore();
+  ctx.save(); ctx.translate(X(6), ry); if (flipped) ctx.rotate(Math.PI); ctx.fillText('汉 界', 0, 0); ctx.restore();
+}
+function drawPiece(p, x, y, lifted) {
+  const R = cell * .45, red = p < 'a';
+  ctx.save();
+  if (lifted) { ctx.translate(0, -3); }
+  ctx.fillStyle = 'rgba(60,30,0,.35)'; ctx.beginPath(); ctx.arc(x + 1.5, y + 2.5, R, 0, 7); ctx.fill();
+  const g = ctx.createRadialGradient(x - R * .35, y - R * .4, R * .1, x, y, R);
+  g.addColorStop(0, '#fffaf0'); g.addColorStop(1, '#ecd9b4');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill();
+  ctx.strokeStyle = red ? '#c8102e' : '#22252c'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(x, y, R * .84, 0, 7); ctx.stroke();
+  ctx.fillStyle = red ? '#c8102e' : '#22252c'; ctx.font = `700 ${R * 1.12}px ${CN_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(E.NAMES[p], x, y + R * .06);
+  ctx.restore();
+}
+function draw() {
+  if (!pos) return;
+  drawBoard();
+  if (lastMove) for (const s of [lastMove.from, lastMove.to]) {
+    const [x, y] = toXY(s); ctx.strokeStyle = 'rgba(30,110,255,.85)'; ctx.lineWidth = 2; const k = cell * .5;
+    ctx.beginPath(); for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { ctx.moveTo(x + sx * k, y + sy * k * .55); ctx.lineTo(x + sx * k, y + sy * k); ctx.lineTo(x + sx * k * .55, y + sy * k); } ctx.stroke();
+  }
+  if (pos.inCheck()) {
+    const [x, y] = toXY(pos.ksq[pos.side]);
+    const g = ctx.createRadialGradient(x, y, cell * .3, x, y, cell * .75); g.addColorStop(0, 'rgba(255,30,60,.85)'); g.addColorStop(1, 'rgba(255,30,60,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, cell * .75, 0, 7); ctx.fill();
+  }
+  for (let s = 0; s < 90; s++) { const p = pos.b[s]; if (p) { const [x, y] = toXY(s); drawPiece(p, x, y, s === sel); } }
+  if (sel >= 0) { const [x, y] = toXY(sel); ctx.strokeStyle = '#2f7bff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y - 3, cell * .48, 0, 7); ctx.stroke(); }
+  for (const m of targets) {
+    const [x, y] = toXY(m.to); ctx.beginPath();
+    if (m.cap) { ctx.strokeStyle = 'rgba(47,123,255,.9)'; ctx.lineWidth = 3; ctx.arc(x, y, cell * .47, 0, 7); ctx.stroke(); }
+    else { ctx.fillStyle = 'rgba(47,123,255,.75)'; ctx.arc(x, y, cell * .13, 0, 7); ctx.fill(); }
+  }
+}
+const sideName = s => (s === 'w' ? '红方' : '黑方');
+function updateStatus() {
+  if (over) {
+    const t = over.type === 'mate' ? `绝杀！${sideName(over.winner)}胜` : over.type === 'stalemate' ? `困毙！${sideName(over.winner)}胜` : over.type === 'material' ? '和棋（双方无进攻子力）' : '和棋（三次重复局面）';
+    statusEl.innerHTML = `<b>${t}</b>`; return;
+  }
+  const dot = `<span class="dot" style="background:${pos.side === 'w' ? '#c8102e' : '#22252c'}"></span>`;
+  const who = cfg.mode === 'ai' ? (pos.side === cfg.human ? '轮到你' : '电脑思考中…') : `${sideName(pos.side)}走棋`;
+  statusEl.innerHTML = `${dot}<b>${who}</b>${pos.inCheck() ? ' · 将军！' : ''}`;
+}
+function afterMove(m) {
+  lastMove = m; sel = -1; targets = []; const k = pos.key(); keys.push(k);
+  over = pos.result(keys.filter(x => x === k).length);
+  updateStatus(); draw();
+  if (over) { setTimeout(() => PB.toast(statusEl.textContent, 2600), 200); return; }
+  maybeAI();
+}
+async function maybeAI() {
+  if (over || cfg.mode !== 'ai' || pos.side === cfg.human) return;
+  thinking = true; updateStatus();
+  const token = ++aiToken, t0 = Date.now();
+  const r = await runAI({ state: { b: pos.b.slice(), side: pos.side, ksq: { ...pos.ksq } }, level: cfg.level });
+  if (token !== aiToken || !r) return;
+  if (Date.now() - t0 < 350) await PB.sleep(350 - (Date.now() - t0));
+  if (token !== aiToken) return;
+  const m = pos.legal().find(x => x.from === r.from && x.to === r.to);
+  thinking = false;
+  if (m) { pos.make(m); afterMove(m); }
+}
+cv.addEventListener('pointerdown', ev => {
+  if (over || thinking || (cfg.mode === 'ai' && pos.side !== cfg.human)) return;
+  const rect = cv.getBoundingClientRect(), sx = rect.width / W;
+  let c = Math.round(((ev.clientX - rect.left) / sx - ox) / cell), r = Math.round(((ev.clientY - rect.top) / sx - oy) / cell);
+  if (flipped) { c = 8 - c; r = 9 - r; }
+  if (c < 0 || c > 8 || r < 0 || r > 9) return;
+  const s = r * 9 + c, p = pos.b[s], hit = targets.find(m => m.to === s);
+  if (hit) { pos.make(hit); afterMove(hit); return; }
+  if (p && E.sideOf(p) === pos.side) { sel = s; targets = pos.legal().filter(m => m.from === s); if (!targets.length) PB.toast('这个子现在不能走'); }
+  else { sel = -1; targets = []; }
+  draw();
+});
+function undo() {
+  if (!pos.hist.length) return;
+  aiToken++; thinking = false;
+  const n = cfg.mode === 'ai' ? (pos.side === cfg.human ? 2 : 1) : 1;
+  for (let i = 0; i < n && pos.hist.length; i++) { pos.unmake(); keys.pop(); }
+  over = null; sel = -1; targets = []; lastMove = pos.hist[pos.hist.length - 1] || null;
+  updateStatus(); draw(); maybeAI();
+}
+async function newGame(ask) {
+  aiToken++; thinking = false;
+  if (ask || !cfg) {
+    const mode = await PB.choose('选择模式', [
+      { label: '人机对战', hint: '和电脑下', value: 'ai', primary: true },
+      { label: '双人同屏', hint: '两人轮流用一台手机', value: 'pvp' }]);
+    let level = 'normal', human = 'w';
+    if (mode === 'ai') {
+      level = await PB.choose('电脑难度', PB.LEVELS);
+      human = await PB.choose('选择执子', [{ label: '执红（先走）', value: 'w', primary: true }, { label: '执黑（后走）', value: 'b' }]);
+    }
+    cfg = { mode, level, human }; PB.store.set('xiangqi:cfg', cfg);
+  }
+  pos = new E.Pos(); keys = [pos.key()]; sel = -1; targets = []; lastMove = null; over = null;
+  flipped = cfg.mode === 'ai' && cfg.human === 'b';
+  updateStatus(); layout(); maybeAI();
+}
+document.getElementById('newBtn').onclick = () => newGame(true);
+document.getElementById('undoBtn').onclick = undo;
+document.getElementById('flipBtn').onclick = () => { flipped = !flipped; draw(); };
+PB.markPlayed('xiangqi');
+cfg = PB.store.get('xiangqi:cfg', null);
+newGame(!cfg);
+</script>
+</body>
+</html>
