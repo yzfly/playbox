@@ -4,11 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0b0d14">
-<title>中国象棋 · 童年游戏盒</title>
+<title>中国象棋在线玩 - 免费人机对战、双人对弈 | 童年游戏盒</title>
+<meta name="description" content="免费在线中国象棋，手机浏览器打开即玩：人机对战（简单/普通/困难三档）、双人同屏对弈，规则完整，支持悔棋、翻转棋盘，无需下载、无广告。">
+<meta name="keywords" content="中国象棋,象棋在线玩,象棋人机对战,象棋小游戏,双人象棋,免费象棋">
+<link rel="canonical" href="https://code.jiangshu.ai/playbox/games/xiangqi/">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="manifest" href="../../manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="童年游戏盒 PlayBox">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="中国象棋在线玩 - 免费人机对战、双人对弈 | 童年游戏盒">
+<meta property="og:description" content="免费在线中国象棋，手机浏览器打开即玩：人机对战（简单/普通/困难三档）、双人同屏对弈，规则完整，支持悔棋、翻转棋盘，无需下载、无广告。">
+<meta property="og:url" content="https://code.jiangshu.ai/playbox/games/xiangqi/">
+<meta property="og:image" content="https://code.jiangshu.ai/playbox/assets/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "中国象棋", "description": "免费在线中国象棋，手机浏览器打开即玩：人机对战（简单/普通/困难三档）、双人同屏对弈，规则完整，支持悔棋、翻转棋盘，无需下载、无广告。", "url": "https://code.jiangshu.ai/playbox/games/xiangqi/", "image": "https://code.jiangshu.ai/playbox/assets/screenshots/xiangqi.webp", "genre": ["Board game", "Strategy"], "playMode": ["SinglePlayer", "MultiPlayer"], "gamePlatform": ["Web browser", "Mobile"], "applicationCategory": "Game", "operatingSystem": "Any", "inLanguage": "zh-CN", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CNY"}, "isPartOf": {"@type": "WebSite", "name": "童年游戏盒 PlayBox", "url": "https://code.jiangshu.ai/playbox/"}}</script>
 <link rel="stylesheet" href="../../shared/ui.css">
 </head>
 <body class="game">
-<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>中国象棋</h1><button class="btn sm primary" id="newBtn">新局</button></header>
+<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>中国象棋</h1><button class="btn sm" data-howto>玩法</button><button class="btn sm primary" id="newBtn">新局</button></header>
 <main class="stage">
   <div class="status" id="status"></div>
   <canvas class="board" id="board"></canvas>
@@ -17,6 +31,18 @@
     <button class="btn" id="flipBtn">翻转棋盘</button>
   </div>
 </main>
+<section id="howto" hidden>
+<h2>中国象棋玩法</h2>
+<p>红先黑后，双方轮流走一步，<b>将死</b>对方的将（帅）即获胜。</p>
+<h3>棋子走法</h3>
+<ul><li>帅/将：只在九宫内走，每步横竖一格；双方将帅不能在同一直线上直接照面。</li>
+<li>仕/士：九宫内斜走一格。相/象：走“田”字，不能过河，田字中心有子（塞象眼）不能走。</li>
+<li>马：走“日”字，紧挨的方向有子（蹩马腿）不能走。车：横竖直走，格数不限。</li>
+<li>炮：不吃子时同车；吃子时必须隔一个子（炮架）跳吃。</li>
+<li>兵/卒：过河前只能向前，过河后可以向前或左右走一格。</li></ul>
+<h3>胜负</h3>
+<p>将死对方，或对方无子可走（困毙）即获胜。人机模式可选简单、普通、困难三档，也可以两人用一台手机轮流下。</p>
+</section>
 <script src="../../shared/ui.js"></script>
 <script src="engine.js"></script>
 <script>

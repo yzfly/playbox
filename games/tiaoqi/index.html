@@ -4,11 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0b0d14">
-<title>跳棋 · 童年游戏盒</title>
+<title>跳棋在线玩 - 免费六角星跳棋 2-6 人 | 童年游戏盒</title>
+<meta name="description" content="免费在线跳棋（中国跳棋），六角星棋盘，手机打开即玩：可与 1、2 或 5 个电脑对战，也可双人同屏，支持连跳、悔棋与提示。">
+<meta name="keywords" content="跳棋,跳棋在线玩,中国跳棋,六角跳棋,跳棋小游戏,跳棋人机对战">
+<link rel="canonical" href="https://code.jiangshu.ai/playbox/games/tiaoqi/">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="manifest" href="../../manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="童年游戏盒 PlayBox">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="跳棋在线玩 - 免费六角星跳棋 2-6 人 | 童年游戏盒">
+<meta property="og:description" content="免费在线跳棋（中国跳棋），六角星棋盘，手机打开即玩：可与 1、2 或 5 个电脑对战，也可双人同屏，支持连跳、悔棋与提示。">
+<meta property="og:url" content="https://code.jiangshu.ai/playbox/games/tiaoqi/">
+<meta property="og:image" content="https://code.jiangshu.ai/playbox/assets/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "跳棋", "description": "免费在线跳棋（中国跳棋），六角星棋盘，手机打开即玩：可与 1、2 或 5 个电脑对战，也可双人同屏，支持连跳、悔棋与提示。", "url": "https://code.jiangshu.ai/playbox/games/tiaoqi/", "image": "https://code.jiangshu.ai/playbox/assets/screenshots/tiaoqi.webp", "genre": ["Board game", "Strategy"], "playMode": ["SinglePlayer", "MultiPlayer"], "gamePlatform": ["Web browser", "Mobile"], "applicationCategory": "Game", "operatingSystem": "Any", "inLanguage": "zh-CN", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CNY"}, "isPartOf": {"@type": "WebSite", "name": "童年游戏盒 PlayBox", "url": "https://code.jiangshu.ai/playbox/"}}</script>
 <link rel="stylesheet" href="../../shared/ui.css">
 </head>
 <body class="game">
-<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>跳棋</h1><button class="btn sm primary" id="newBtn">新局</button></header>
+<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>跳棋</h1><button class="btn sm" data-howto>玩法</button><button class="btn sm primary" id="newBtn">新局</button></header>
 <main class="stage">
   <div class="status" id="status"></div>
   <canvas class="board" id="board"></canvas>
@@ -17,6 +31,15 @@
     <button class="btn" id="hintBtn">提示</button>
   </div>
 </main>
+<section id="howto" hidden>
+<h2>跳棋玩法</h2>
+<p>把自己的 10 颗棋子从起点营地全部移到<b>正对面的营地</b>，最先完成的玩家获胜。</p>
+<h3>规则</h3>
+<ul><li>走一步：棋子可以移到相邻的空位。</li>
+<li>跳：相邻位置有棋子（不论颜色）、且它后面是空位时，可以跳过去；跳完还能继续跳，一回合可以连跳多次。</li>
+<li>被跳过的棋子不会被吃掉。</li>
+<li>技巧：给自己搭“梯子”连跳最快，也别忘了堵住对手的路。</li></ul>
+</section>
 <script src="../../shared/ui.js"></script>
 <script src="engine.js"></script>
 <script>

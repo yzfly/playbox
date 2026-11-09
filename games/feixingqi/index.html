@@ -4,7 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0b0d14">
-<title>飞行棋 · 童年游戏盒</title>
+<title>飞行棋在线玩 - 免费 1-4 人掷骰子棋 | 童年游戏盒</title>
+<meta name="description" content="免费在线飞行棋，手机打开即玩：1 到 4 人，可与电脑混合对战，也能多人同屏轮流掷骰。掷 6 起飞、同色跳跃、飞行捷径、撞机回营，规则完整。">
+<meta name="keywords" content="飞行棋,飞行棋在线玩,飞行棋小游戏,多人飞行棋,飞行棋单机,掷骰子游戏">
+<link rel="canonical" href="https://code.jiangshu.ai/playbox/games/feixingqi/">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="manifest" href="../../manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="童年游戏盒 PlayBox">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="飞行棋在线玩 - 免费 1-4 人掷骰子棋 | 童年游戏盒">
+<meta property="og:description" content="免费在线飞行棋，手机打开即玩：1 到 4 人，可与电脑混合对战，也能多人同屏轮流掷骰。掷 6 起飞、同色跳跃、飞行捷径、撞机回营，规则完整。">
+<meta property="og:url" content="https://code.jiangshu.ai/playbox/games/feixingqi/">
+<meta property="og:image" content="https://code.jiangshu.ai/playbox/assets/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "飞行棋", "description": "免费在线飞行棋，手机打开即玩：1 到 4 人，可与电脑混合对战，也能多人同屏轮流掷骰。掷 6 起飞、同色跳跃、飞行捷径、撞机回营，规则完整。", "url": "https://code.jiangshu.ai/playbox/games/feixingqi/", "image": "https://code.jiangshu.ai/playbox/assets/screenshots/feixingqi.webp", "genre": ["Board game", "Party game"], "playMode": ["SinglePlayer", "MultiPlayer"], "gamePlatform": ["Web browser", "Mobile"], "applicationCategory": "Game", "operatingSystem": "Any", "inLanguage": "zh-CN", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CNY"}, "isPartOf": {"@type": "WebSite", "name": "童年游戏盒 PlayBox", "url": "https://code.jiangshu.ai/playbox/"}}</script>
 <link rel="stylesheet" href="../../shared/ui.css">
 <style>
 .dicebar { display: flex; align-items: center; gap: 14px; }
@@ -13,12 +27,23 @@
 </style>
 </head>
 <body class="game">
-<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>飞行棋</h1><button class="btn sm primary" id="newBtn">新局</button></header>
+<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>飞行棋</h1><button class="btn sm" data-howto>玩法</button><button class="btn sm primary" id="newBtn">新局</button></header>
 <main class="stage">
   <div class="status" id="status"></div>
   <canvas class="board" id="board"></canvas>
   <div class="dicebar"><canvas id="dice"></canvas><button class="btn primary" id="rollBtn">掷骰子</button></div>
 </main>
+<section id="howto" hidden>
+<h2>飞行棋玩法</h2>
+<p>每人 4 架飞机，轮流掷骰子，最先让 4 架飞机全部到达中心终点的玩家获胜。</p>
+<h3>规则</h3>
+<ul><li>起飞：掷出 6 点才能让机场里的飞机起飞。</li>
+<li>再掷：掷出 6 点可以再掷一次，最多连掷三次。</li>
+<li>同色跳：停在和自己颜色相同的格子上，会再向前跳到下一个同色格。</li>
+<li>飞行捷径：停在本色的飞行起点，会沿虚线直接飞越到对面。</li>
+<li>撞机：停在对手飞机所在的格子，对手的飞机被撞回机场。</li>
+<li>进终点：必须正好走到终点，点数多了会倒退回来。</li></ul>
+</section>
 <script src="../../shared/ui.js"></script>
 <script src="engine.js"></script>
 <script>

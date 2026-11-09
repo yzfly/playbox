@@ -4,10 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d14">
-<meta name="description" content="童年游戏盒：开源、免费、无广告的手机网页小游戏合集">
+<meta name="description" content="童年游戏盒是开源、免费、无广告的手机网页小游戏合集：中国象棋、国际象棋、五子棋、飞行棋、跳棋、竖版飞机射击，打开浏览器即玩，支持人机对战和多人同屏，无需下载安装。">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<title>童年游戏盒 PlayBox</title>
+<title>童年游戏盒 PlayBox - 免费在线小游戏：中国象棋、国际象棋、五子棋、飞行棋、跳棋、飞机射击</title>
+<meta name="keywords" content="小游戏,在线小游戏,免费小游戏,手机小游戏,网页游戏,童年游戏,经典小游戏,中国象棋,国际象棋,五子棋,飞行棋,跳棋,飞机大战,开源游戏">
+<link rel="canonical" href="https://code.jiangshu.ai/playbox/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="童年游戏盒 PlayBox">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="童年游戏盒 PlayBox - 开源免费的手机小游戏合集">
+<meta property="og:description" content="童年游戏盒是开源、免费、无广告的手机网页小游戏合集：中国象棋、国际象棋、五子棋、飞行棋、跳棋、竖版飞机射击，打开浏览器即玩，支持人机对战和多人同屏，无需下载安装。">
+<meta property="og:url" content="https://code.jiangshu.ai/playbox/">
+<meta property="og:image" content="https://code.jiangshu.ai/playbox/assets/og.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "WebSite", "name": "童年游戏盒 PlayBox", "alternateName": ["PlayBox", "童年游戏盒"], "url": "https://code.jiangshu.ai/playbox/", "description": "童年游戏盒是开源、免费、无广告的手机网页小游戏合集：中国象棋、国际象棋、五子棋、飞行棋、跳棋、竖版飞机射击，打开浏览器即玩，支持人机对战和多人同屏，无需下载安装。", "inLanguage": "zh-CN"}, {"@context": "https://schema.org", "@type": "ItemList", "name": "童年游戏盒游戏列表", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "星穹迅击", "url": "https://code.jiangshu.ai/playbox/games/skybolt/"}, {"@type": "ListItem", "position": 2, "name": "中国象棋", "url": "https://code.jiangshu.ai/playbox/games/xiangqi/"}, {"@type": "ListItem", "position": 3, "name": "国际象棋", "url": "https://code.jiangshu.ai/playbox/games/chess/"}, {"@type": "ListItem", "position": 4, "name": "五子棋", "url": "https://code.jiangshu.ai/playbox/games/gomoku/"}, {"@type": "ListItem", "position": 5, "name": "飞行棋", "url": "https://code.jiangshu.ai/playbox/games/feixingqi/"}, {"@type": "ListItem", "position": 6, "name": "跳棋", "url": "https://code.jiangshu.ai/playbox/games/tiaoqi/"}]}]</script>
 <link rel="stylesheet" href="shared/ui.css">
 <style>
 body { min-height: 100dvh; }
@@ -39,6 +52,14 @@ h2.sec { font-size: 15px; color: var(--dim); font-weight: 600; margin: 18px 2px 
 .recent a em { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-style: normal; color: #fff; font-size: 16px; }
 .empty { color: var(--dim); font-size: 14px; padding: 20px 0; text-align: center; }
 footer { margin-top: 28px; color: var(--dim); font-size: 12px; text-align: center; line-height: 1.8; }
+.about { margin-top: 30px; padding: 18px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; }
+.about h2 { margin: 0 0 8px; font-size: 16px; }
+.about p { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.8; }
+.about ul { margin: 10px 0 0; padding-left: 1.1em; }
+.about li { color: var(--dim); font-size: 13px; line-height: 1.8; }
+.about a { text-decoration: none; color: var(--dim); }
+.about a b { color: var(--text); font-weight: 600; }
+footer a { color: var(--dim); }
 </style>
 </head>
 <body>
@@ -52,7 +73,19 @@ footer { margin-top: 28px; color: var(--dim); font-size: 12px; text-align: cente
   <section id="recentSec" hidden><h2 class="sec">最近玩过</h2><div class="recent" id="recent"></div></section>
   <h2 class="sec" id="allTitle">全部游戏</h2>
   <div class="grid" id="grid"></div>
-  <footer>童年游戏盒 PlayBox · MIT 开源<br>所有游戏均为原创实现，进度只保存在本机</footer>
+  <section class="about">
+    <h2>关于童年游戏盒</h2>
+    <p>童年游戏盒（PlayBox）是一个开源、免费、无广告的手机网页小游戏合集，收录中国象棋、国际象棋、五子棋、飞行棋、跳棋等经典棋类，以及原创的飞机射击游戏。不用下载安装，手机浏览器打开就能玩，还可以添加到主屏幕；可以和电脑对战，也可以和朋友用同一台手机轮流玩。游戏进度只保存在你的手机上，不收集任何个人信息。</p>
+    <ul>
+    <li><a href="games/skybolt/"><b>星穹迅击</b>：原创竖版飞机射击，拖动战机躲弹幕，挑战旗舰 Boss。</a></li>
+    <li><a href="games/xiangqi/"><b>中国象棋</b>：楚河汉界，蹩马腿、炮翻山、将帅不照面，规则完整；人机三档难度或双人对弈。</a></li>
+    <li><a href="games/chess/"><b>国际象棋</b>：王车易位、吃过路兵、兵升变、逼和都支持；人机三档难度或双人对弈。</a></li>
+    <li><a href="games/gomoku/"><b>五子棋</b>：15 路标准棋盘，先连五子者胜；带落子提示与悔棋。</a></li>
+    <li><a href="games/feixingqi/"><b>飞行棋</b>：1 到 4 人，掷 6 起飞、同色跳、飞行捷径、撞机回营，可和电脑一起玩。</a></li>
+    <li><a href="games/tiaoqi/"><b>跳棋</b>：六角星棋盘，2、3、6 人局，连跳到对面营地。</a></li>
+    </ul>
+  </section>
+  <footer>童年游戏盒 PlayBox · MIT 开源<br>所有游戏均为原创实现，进度只保存在本机<br><a href="https://github.com/yzfly/playbox">GitHub 源码</a></footer>
 </div>
 <script src="shared/ui.js"></script>
 <script src="games.js"></script>

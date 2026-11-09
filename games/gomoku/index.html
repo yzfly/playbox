@@ -4,11 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0b0d14">
-<title>五子棋 · 童年游戏盒</title>
+<title>五子棋在线玩 - 免费人机对战、双人对弈 | 童年游戏盒</title>
+<meta name="description" content="免费在线五子棋，15 路标准棋盘，手机打开即玩：三档难度人机对战、双人同屏，支持悔棋和落子提示，无需下载、无广告。">
+<meta name="keywords" content="五子棋,五子棋在线玩,五子棋人机对战,五子棋小游戏,双人五子棋,gomoku">
+<link rel="canonical" href="https://code.jiangshu.ai/playbox/games/gomoku/">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="manifest" href="../../manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="童年游戏盒 PlayBox">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="五子棋在线玩 - 免费人机对战、双人对弈 | 童年游戏盒">
+<meta property="og:description" content="免费在线五子棋，15 路标准棋盘，手机打开即玩：三档难度人机对战、双人同屏，支持悔棋和落子提示，无需下载、无广告。">
+<meta property="og:url" content="https://code.jiangshu.ai/playbox/games/gomoku/">
+<meta property="og:image" content="https://code.jiangshu.ai/playbox/assets/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "五子棋", "description": "免费在线五子棋，15 路标准棋盘，手机打开即玩：三档难度人机对战、双人同屏，支持悔棋和落子提示，无需下载、无广告。", "url": "https://code.jiangshu.ai/playbox/games/gomoku/", "image": "https://code.jiangshu.ai/playbox/assets/screenshots/gomoku.webp", "genre": ["Board game", "Puzzle"], "playMode": ["SinglePlayer", "MultiPlayer"], "gamePlatform": ["Web browser", "Mobile"], "applicationCategory": "Game", "operatingSystem": "Any", "inLanguage": "zh-CN", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CNY"}, "isPartOf": {"@type": "WebSite", "name": "童年游戏盒 PlayBox", "url": "https://code.jiangshu.ai/playbox/"}}</script>
 <link rel="stylesheet" href="../../shared/ui.css">
 </head>
 <body class="game">
-<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>五子棋</h1><button class="btn sm primary" id="newBtn">新局</button></header>
+<header class="topbar"><a class="back" href="../../" aria-label="返回大厅">‹</a><h1>五子棋</h1><button class="btn sm" data-howto>玩法</button><button class="btn sm primary" id="newBtn">新局</button></header>
 <main class="stage">
   <div class="status" id="status"></div>
   <canvas class="board" id="board"></canvas>
@@ -17,6 +31,14 @@
     <button class="btn" id="hintBtn">提示</button>
   </div>
 </main>
+<section id="howto" hidden>
+<h2>五子棋玩法</h2>
+<p>黑先白后，双方轮流在 15×15 棋盘的交叉点上落子，先在横、竖或斜线上连成<b>五子</b>的一方获胜。</p>
+<h3>小技巧</h3>
+<ul><li>“活三”（两端都空的三连）和“冲四”（再下一子就成五）威胁最大，对方必须防守。</li>
+<li>同时做出两个威胁（双三、四三）对方就挡不住了。</li>
+<li>点“提示”可以看电脑推荐的落子位置，下错了可以悔棋。</li></ul>
+</section>
 <script src="../../shared/ui.js"></script>
 <script src="engine.js"></script>
 <script>

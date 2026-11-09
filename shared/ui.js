@@ -31,6 +31,18 @@
       document.body.appendChild(m);
     });
   };
+  // 玩法说明：页面里的 <section id="howto" hidden> 是静态文字（便于搜索引擎收录），点 [data-howto] 按钮在底部面板中显示
+  PB.showHowto = function () {
+    const src = document.getElementById('howto'); if (!src) return;
+    const m = document.createElement('div'); m.className = 'pb-modal';
+    const s = document.createElement('div'); s.className = 'pb-sheet pb-rules'; m.appendChild(s);
+    s.innerHTML = src.innerHTML;
+    const ok = document.createElement('button'); ok.className = 'btn primary'; ok.textContent = '知道了'; s.appendChild(ok);
+    const close = () => m.remove();
+    ok.onclick = close; m.addEventListener('click', e => { if (e.target === m) close(); });
+    document.body.appendChild(m);
+  };
+  document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-howto]')) PB.showHowto(); });
   PB.markPlayed = function (id) {
     const r = PB.store.get('recent', []).filter(x => x !== id); r.unshift(id); PB.store.set('recent', r.slice(0, 8));
   };

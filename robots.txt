@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /tests/
+
+Sitemap: https://code.jiangshu.ai/playbox/sitemap.xml

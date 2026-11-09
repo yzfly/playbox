@@ -44,3 +44,11 @@ canvas.board { display: block; border-radius: 12px; touch-action: none; }
 .pb-sheet .opts .btn.primary small { color: rgba(255,255,255,.75); }
 @keyframes pbfade { from { opacity: 0; } }
 @keyframes pbup { from { transform: translateY(40px); opacity: 0; } }
+
+.topbar .btn.sm + .btn.sm { margin-left: -2px; }
+.pb-rules { max-height: 78dvh; overflow-y: auto; user-select: text; -webkit-user-select: text; }
+.pb-rules h2 { margin-bottom: 10px; }
+.pb-rules h3 { font-size: 15px; margin: 14px 0 6px; color: var(--text); }
+.pb-rules p, .pb-rules li { color: #c3cbe0; font-size: 14px; line-height: 1.7; margin: 0; }
+.pb-rules ul { padding-left: 1.2em; margin: 0; }
+.pb-rules > .btn { width: 100%; margin-top: 18px; padding: 12px; }
